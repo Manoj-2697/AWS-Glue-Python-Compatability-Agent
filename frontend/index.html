@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS Glue Terraform AI Analyzer | Cloud Architecture & Python Cross-Compatibility</title>
+  <meta name="description" content="AI-powered compatibility analysis for AWS Glue Terraform resources, worker types, runtime Python versions, and PyPI dependencies.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <a href="#" class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-text">
+        <h1>AWS Glue AI Analyzer</h1>
+        <p>Terraform &middot; Worker Types &middot; Python Matrix</p>
+      </div>
+    </a>
+    <div class="nav-actions">
+      <div id="userBadge" class="user-badge hidden">
+        <img id="userAvatar" class="user-avatar" src="" alt="User Avatar">
+        <span id="userName">User</span>
+        <button id="logoutBtn" class="btn-secondary" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 4px; margin-left: 6px;">Disconnect</button>
+      </div>
+      <a href="https://docs.aws.amazon.com/glue/latest/dg/add-job-python.html" target="_blank" class="btn btn-secondary" style="font-size: 0.8rem; padding: 6px 14px;">AWS Glue Docs ↗</a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <!-- Hero Header -->
+    <section class="hero">
+      <div class="hero-tag">
+        <span>🤖</span> Autonomous Cloud AI Intelligence
+      </div>
+      <h2>Validate AWS Glue Terraform <span class="highlight">Worker Types &amp; Python Compatibility</span></h2>
+      <p>Connect your GitHub account or scan Terraform repositories directly. Our AI parses Glue resources, extracts worker types (G.1X, G.2X, G.4X, Standard), derives runtime Python engines, and performs deep cross-compatibility matrix checks on all additional python packages.</p>
+    </section>
+
+    <!-- Tabs Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tabGithubBtn" onclick="switchTab('github')">🔗 GitHub Repository Analyzer</button>
+      <button class="tab-btn" id="tabDirectBtn" onclick="switchTab('direct')">📝 Direct Terraform HCL Playground</button>
+      <button class="tab-btn" id="tabMatrixBtn" onclick="switchTab('matrix')">📊 Glue &amp; Python Matrix Reference</button>
+    </div>
+
+    <!-- Tab 1: GitHub Connection & Flow -->
+    <div id="tabGithub">
+      
+      <!-- Connect GitHub Panel -->
+      <section class="glass-panel" id="authSection">
+        <div class="auth-panel">
+          <div>
+            <div class="panel-header">
+              <div class="icon-wrap">🐙</div>
+              <h3>Connect to GitHub Account</h3>
+            </div>
+            <p class="auth-desc">Authenticate securely with a GitHub Personal Access Token (classic or fine-grained with <code>repo</code> scope) to fetch your private and public repositories containing Terraform code.</p>
+            
+            <div class="input-group">
+              <label class="input-label" for="ghToken">
+                GitHub Personal Access Token (PAT)
+                <a href="https://github.com/settings/tokens" target="_blank">Generate Token ↗</a>
+              </label>
+              <input type="password" id="ghToken" class="styled-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxx or type 'demo'">
+              <span class="input-hint">Tip: Enter your token or click "Quick Demo Mode" to test instantly with sample Glue infrastructure repos.</span>
+            </div>
+
+            <div class="btn-row">
+              <button id="connectGhBtn" class="btn btn-primary" onclick="handleGitHubAuth()">
+                <span id="connectSpinner" class="spinner hidden"></span>
+                <span>Connect &amp; List Repositories</span>
+              </button>
+              <button class="btn btn-secondary" onclick="useDemoAccount()">
+                <span>⚡ Quick Demo Mode</span>
+              </button>
+            </div>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.25); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: center; gap: 12px; border: 1px dashed var(--border-glass);">
+            <div style="font-size: 0.9rem; font-weight: 600; color: #93c5fd;">What the AI engine checks:</div>
+            <ul style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; padding-left: 1.25rem;">
+              <li><strong>Worker Type Specs:</strong> Evaluates G.1X, G.2X, G.4X, G.8X, Standard against memory, vCPU, and deprecation states.</li>
+              <li><strong>Glue Runtime Python:</strong> Maps Glue 2.0/3.0/4.0/5.0 to runtime Python (3.7, 3.10, 3.11).</li>
+              <li><strong>Package Cross-Check:</strong> PyPI metadata resolution for <code>--additional-python-modules</code>.</li>
+              <li><strong>Pre-installed Bundle Collisions:</strong> Detects version overrides of PySpark, Boto3, Pandas &amp; Scipy.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Repository Selection Browser -->
+      <section class="glass-panel repo-browser" id="repoSection">
+        <div class="repo-header">
+          <div>
+            <h3 style="font-size: 1.35rem; font-weight: 700;">Select Repository for Glue Analysis</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Choose a repository to recursively scan for <code>.tf</code> files and AWS Glue definitions.</p>
+          </div>
+          <div class="repo-controls">
+            <input type="text" id="repoSearch" class="search-input" placeholder="🔍 Search repositories..." oninput="filterRepos()">
+            <button class="btn btn-secondary" onclick="refreshRepositories()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div id="repoList" class="repo-grid">
+          <!-- Dynamic cards injected via app.js -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+          <button id="runRepoAnalysisBtn" class="btn btn-primary" style="padding: 14px 28px; font-size: 1rem;" disabled onclick="executeRepoAnalysis()">
+            <span id="analysisSpinner" class="spinner hidden"></span>
+            <span>⚡ Run AI Compatibility Analysis</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Analysis Results & Report Panel -->
+      <section class="glass-panel report-section" id="reportSection">
+        <div class="report-header">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h3 style="font-size: 1.5rem; font-weight: 700;">AI Compatibility Analysis Report</h3>
+              <span id="repoNameBadge" class="badge-tag pass" style="font-size: 0.8rem;"></span>
+            </div>
+            <p id="reportSubheader" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;"></p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="exportReportJson()">📥 Export JSON</button>
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print / Save PDF</button>
+          </div>
+        </div>
+
+        <!-- Summary Metrics Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value" id="statTotalJobs" style="color: #60a5fa;">0</div>
+            <div class="stat-label">Glue Jobs Analyzed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statHealthy" style="color: #34d399;">0</div>
+            <div class="stat-label">Fully Compatible</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statWarnings" style="color: #fbbf24;">0</div>
+            <div class="stat-label">Advisories &amp; Warnings</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="statActionReq" style="color: #f87171;">0</div>
+            <div class="stat-label">Action Required</div>
+          </div>
+        </div>
+
+        <!-- Jobs Detailed Analysis List -->
+        <div id="jobsListContainer">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Tab 2: Direct HCL Playground -->
+    <div id="tabDirect" class="hidden">
+      <section class="glass-panel">
+        <div class="panel-header">
+          <div class="icon-wrap">📝</div>
+          <div>
+            <h3>Direct Terraform HCL Playground</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Paste raw Terraform code containing <code>resource "aws_glue_job"</code> to analyze worker types and library cross-compatibility immediately.</p>
+          </div>
+        </div>
+
+        <textarea id="directHclEditor" class="code-textarea" spellcheck="false"></textarea>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="loadSampleHcl('glue4')">Load Glue 4.0 Sample</button>
+            <button class="btn btn-secondary" onclick="loadSampleHcl('glue3_conflict')">Load Glue 3.0 Incompatible Sample</button>
+            <button class="btn btn-secondary" onclick="loadSampleHcl('glue5')">Load Glue 5.0 High-End Sample</button>
+          </div>
+          <button id="runDirectAnalysisBtn" class="btn btn-primary" onclick="analyzeDirectHcl()">
+            <span id="directSpinner" class="spinner hidden"></span>
+            <span>Analyze HCL Code</span>
+          </button>
+        </div>
+
+        <div id="directResultsContainer" style="margin-top: 2rem;"></div>
+      </section>
+    </div>
+
+    <!-- Tab 3: Official AWS Glue Matrix Reference -->
+    <div id="tabMatrix" class="hidden">
+      <section class="glass-panel">
+        <div class="panel-header">
+          <div class="icon-wrap">📊</div>
+          <div>
+            <h3>Official AWS Glue Version &amp; Worker Type Matrix</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Authoritative reference specifications for AWS Glue engines, Spark versions, Python runtimes, and worker capacities.</p>
+          </div>
+        </div>
+
+        <div id="matrixTableContainer" class="lib-table-container">
+          <!-- Loaded dynamically -->
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
