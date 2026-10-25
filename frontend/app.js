@@ -328,9 +328,19 @@ function createJobCard(job) {
 
   card.className = `job-card ${statusClass}`;
 
+  // Worker & capacity details (only show if present / not N/A)
   const workerInfo = job.worker_specs || {};
-  const vcpuText = workerInfo.vCPU ? `${workerInfo.vCPU} vCPU` : 'N/A';
-  const memText = workerInfo.memory_gb ? `${workerInfo.memory_gb} GB RAM` : 'N/A';
+  let workerDetails = '';
+  if (workerInfo.vCPU && workerInfo.memory_gb) {
+    workerDetails = ` (${workerInfo.vCPU} vCPU, ${workerInfo.memory_gb} GB RAM)`;
+  }
+
+  let capacityDetails = '';
+  if (job.worker_capacity && job.worker_capacity.total_vcpu && job.worker_capacity.total_memory_gb) {
+    capacityDetails = ` (${job.worker_capacity.total_vcpu} vCPUs, ${job.worker_capacity.total_memory_gb} GB Memory)`;
+  }
+
+  const numWorkers = job.number_of_workers || job.worker_capacity?.num_workers || 2;
 
   // Build libraries table rows
   let libRows = '';
@@ -384,10 +394,10 @@ function createJobCard(job) {
     <!-- Job Specifications Pills -->
     <div class="job-specs-pills">
       <div class="pill">Glue Version: <strong>AWS Glue ${escapeHtml(job.glue_version)}</strong></div>
-      <div class="pill">Worker Type: <strong>${escapeHtml(job.worker_type)}</strong> (${vcpuText}, ${memText})</div>
-      <div class="pill">Cluster Scale: <strong>${job.worker_capacity?.num_workers || 2} Workers</strong> (${job.worker_capacity?.total_vcpu || 'N/A'} vCPUs, ${job.worker_capacity?.total_memory_gb || 'N/A'} GB Memory)</div>
+      <div class="pill">Worker Type: <strong>${escapeHtml(job.worker_type)}</strong>${workerDetails}</div>
+      <div class="pill">Cluster Scale: <strong>${numWorkers} Workers</strong>${capacityDetails}</div>
       <div class="pill">Runtime Python: <strong style="color: #38bdf8;">Python ${escapeHtml(job.runtime_python)}</strong></div>
-      <div class="pill">Engine: <strong>${escapeHtml(job.spark_version || 'PySpark')}</strong></div>
+      ${job.spark_version ? `<div class="pill">Engine: <strong>${escapeHtml(job.spark_version)}</strong></div>` : ''}
     </div>
 
     <!-- AI Insights Box -->
@@ -402,30 +412,32 @@ function createJobCard(job) {
       ` : ''}
     </div>
 
-    <!-- Additional Python Libraries Table -->
-    <div>
-      <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 8px; color: #cbd5e1; display: flex; justify-content: space-between;">
-        <span>Additional Python Libraries Cross-Check (--additional-python-modules)</span>
-        <span style="font-size: 0.8rem; color: var(--text-dim);">${job.library_checks?.length || 0} module(s) analyzed</span>
+    <!-- Additional Python Libraries Table (Only shown if extra modules are present) -->
+    ${job.library_checks && job.library_checks.length > 0 ? `
+      <div>
+        <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 8px; color: #cbd5e1; display: flex; justify-content: space-between;">
+          <span>Additional Python Libraries Cross-Check (--additional-python-modules)</span>
+          <span style="font-size: 0.8rem; color: var(--text-dim);">${job.library_checks.length} module(s) analyzed</span>
+        </div>
+        <div class="lib-table-container">
+          <table class="lib-table">
+            <thead>
+              <tr>
+                <th>Module Argument</th>
+                <th>Package Name</th>
+                <th>Required Python</th>
+                <th>PyPI Latest</th>
+                <th>Status</th>
+                <th>Analysis &amp; Conflict Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${libRows}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div class="lib-table-container">
-        <table class="lib-table">
-          <thead>
-            <tr>
-              <th>Module Argument</th>
-              <th>Package Name</th>
-              <th>Required Python</th>
-              <th>PyPI Latest</th>
-              <th>Status</th>
-              <th>Analysis &amp; Conflict Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${libRows}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    ` : ''}
   `;
 
   return card;
