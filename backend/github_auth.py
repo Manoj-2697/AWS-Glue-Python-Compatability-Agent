@@ -1,9 +1,10 @@
 """
-GitHub API integration service for authentication, repository listing,
-and recursive scanning of Terraform (.tf) files.
+GitHub Authentication and Repository Service
+Handles GitHub Personal Access Token verification, repo listing, and file retrieval.
 """
 import httpx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+
 
 class GitHubService:
     def __init__(self, token: str):
@@ -68,12 +69,10 @@ class GitHubService:
 
     async def find_terraform_files(self, owner: str, repo: str, default_branch: str = "main") -> List[Dict[str, Any]]:
         """Fetches Git Tree recursively to locate all .tf files in the repository."""
-        # 1. Get branch commit sha to retrieve tree
         url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1"
         async with httpx.AsyncClient(timeout=20.0) as client:
             resp = await client.get(url, headers=self.headers)
             if resp.status_code != 200:
-                # Try master if main failed
                 if default_branch == "main":
                     url_master = f"https://api.github.com/repos/{owner}/{repo}/git/trees/master?recursive=1"
                     resp = await client.get(url_master, headers=self.headers)

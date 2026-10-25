@@ -340,9 +340,20 @@ function createJobCard(job) {
       if (lib.status === 'fail') lBadge = '<span class="badge-tag fail">Incompatible</span>';
       if (lib.status === 'warning') lBadge = '<span class="badge-tag warning">Advisory</span>';
 
-      const notesHtml = lib.notes && lib.notes.length > 0
-        ? lib.notes.map(n => `<div style="margin-top: 4px; font-size: 0.8rem; color: ${lib.status === 'fail' ? '#f87171' : '#fbbf24'};">• ${escapeHtml(n)}</div>`).join('')
-        : '<span style="color: var(--text-dim);">No conflicts detected</span>';
+      const issue = lib.issue_summary;
+      let summaryHtml = '';
+      if (issue && issue.is_issue) {
+        summaryHtml = `
+          <div style="margin-top: 6px; padding: 8px 10px; background: rgba(0,0,0,0.3); border-left: 3px solid ${lib.status === 'fail' ? '#ef4444' : '#f59e0b'}; border-radius: 4px; font-size: 0.8rem; line-height: 1.45;">
+            <div><strong style="color: #f87171;">❌ Issue:</strong> ${escapeHtml(issue.what_is_issue)}</div>
+            <div style="margin-top: 3px;"><strong style="color: #fbbf24;">❓ Why Incompatible:</strong> ${escapeHtml(issue.why_not_compatible)}</div>
+            <div style="margin-top: 3px;"><strong style="color: #34d399;">✅ Why Target Version:</strong> ${escapeHtml(issue.why_suggested_version)}</div>
+            <div style="margin-top: 3px;"><strong style="color: #fca5a5;">💥 Error If You Proceed:</strong> <code style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); padding: 1px 4px; border-radius: 3px; color: #fecaca;">${escapeHtml(issue.error_if_proceed)}</code></div>
+          </div>
+        `;
+      } else {
+        summaryHtml = '<span style="color: var(--text-dim); font-size: 0.8rem;">No conflicts detected. Verified compatible with Glue runtime.</span>';
+      }
 
       return `
         <tr>
@@ -351,7 +362,7 @@ function createJobCard(job) {
           <td><span class="code-badge" style="color: #94a3b8;">${escapeHtml(lib.requires_python || 'Any')}</span></td>
           <td>${lib.pypi_latest ? '<span style="color: #38bdf8;">' + lib.pypi_latest + '</span>' : 'N/A'}</td>
           <td>${lBadge}</td>
-          <td>${notesHtml}</td>
+          <td>${summaryHtml}</td>
         </tr>
       `;
     }).join('');
@@ -383,6 +394,12 @@ function createJobCard(job) {
     <div class="ai-insights">
       <h4><span>🤖</span> AI Compatibility Analysis &amp; Guidance</h4>
       <div class="ai-insights-content">${escapeHtml(job.ai_executive_summary)}</div>
+      ${job.groq_analysis && job.groq_analysis.available && job.groq_analysis.analysis ? `
+        <div style="margin-top: 12px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; border-radius: 6px;">
+          <div style="font-weight: 600; color: #60a5fa; margin-bottom: 6px; font-size: 0.85rem;">⚡ Groq AI Cloud Architect Recommendation:</div>
+          <div style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(job.groq_analysis.analysis)}</div>
+        </div>
+      ` : ''}
     </div>
 
     <!-- Additional Python Libraries Table -->
