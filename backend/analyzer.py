@@ -5,6 +5,7 @@ all additional python library dependencies against PyPI and AWS specs,
 computes Inefficiency Percentage, and recommends optimal Glue/Python versions.
 Supports xAI Grok analysis integration.
 """
+import os
 import httpx
 from typing import Dict, Any, List, Optional
 from packaging import version

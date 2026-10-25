@@ -226,8 +226,15 @@ async function executeRepoAnalysis() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        console.warn(`Analysis failed for ${repo.name}:`, err.detail);
+        let errMsg = 'HTTP ' + res.status;
+        try {
+          const err = await res.json();
+          errMsg = err.detail || errMsg;
+        } catch (_) {
+          errMsg = await res.text();
+        }
+        console.warn(`Analysis failed for ${repo.name}:`, errMsg);
+        alert(`Analysis failed for ${repo.name}: ` + errMsg);
         continue;
       }
 
