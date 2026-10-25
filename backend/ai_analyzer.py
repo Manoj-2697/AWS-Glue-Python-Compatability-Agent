@@ -136,11 +136,19 @@ Respond strictly in valid JSON matching this schema:
             method="POST"
         )
 
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            content = json.loads(resp.read().decode("utf-8"))["choices"][0]["message"]["content"]
-            # Extract JSON substring in case model surrounds with text
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            return json.loads(match.group(0) if match else content)
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    content = json.loads(resp.read().decode("utf-8"))["choices"][0]["message"]["content"]
+                    match = re.search(r'\{.*\}', content, re.DOTALL)
+                    return json.loads(match.group(0) if match else content)
+            except urllib.error.HTTPError as e:
+                if e.code == 429 and attempt < max_retries - 1:
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                raise
 
     @classmethod
     async def analyze_job(cls, job: Dict[str, Any], grok_api_key: Optional[str] = None, use_grok: bool = False) -> Dict[str, Any]:
