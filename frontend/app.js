@@ -112,6 +112,8 @@ function refreshRepositories() {
   }
 }
 
+let selectedRepos = new Map(); // Store selected repos by id: id -> repo
+
 function renderRepositories(repos) {
   const grid = document.getElementById('repoList');
   grid.innerHTML = '';
@@ -122,14 +124,17 @@ function renderRepositories(repos) {
   }
 
   repos.forEach(repo => {
+    const isSelected = selectedRepos.has(repo.id);
     const card = document.createElement('div');
-    card.className = `repo-card ${selectedRepo && selectedRepo.id === repo.id ? 'selected' : ''}`;
-    card.onclick = () => selectRepository(repo, card);
+    card.className = `repo-card ${isSelected ? 'selected' : ''}`;
+    card.id = `repo-card-${repo.id}`;
+    card.onclick = () => toggleSelectRepository(repo, card);
 
     card.innerHTML = `
       <div>
         <div class="repo-card-top">
           <div class="repo-title">
+            <input type="checkbox" id="chk-${repo.id}" ${isSelected ? 'checked' : ''} style="margin-right: 8px; transform: scale(1.2); cursor: pointer;" onclick="event.stopPropagation(); toggleSelectRepository(repo, card);">
             <span>📁</span> ${escapeHtml(repo.name)}
           </div>
           <span class="repo-badge">${repo.private ? '🔒 Private' : '🌐 Public'}</span>
@@ -145,27 +150,42 @@ function renderRepositories(repos) {
 
     grid.appendChild(card);
   });
+  updateAnalysisButtonState();
 }
 
-function filterRepos() {
-  const query = document.getElementById('repoSearch').value.toLowerCase();
-  const filtered = repositories.filter(r => 
-    r.name.toLowerCase().includes(query) || 
-    (r.description && r.description.toLowerCase().includes(query))
-  );
-  renderRepositories(filtered);
+function toggleSelectRepository(repo, cardElement) {
+  if (selectedRepos.has(repo.id)) {
+    selectedRepos.delete(repo.id);
+    if (cardElement) cardElement.classList.remove('selected');
+    const chk = document.getElementById(`chk-${repo.id}`);
+    if (chk) chk.checked = false;
+  } else {
+    selectedRepos.set(repo.id, repo);
+    if (cardElement) cardElement.classList.add('selected');
+    const chk = document.getElementById(`chk-${repo.id}`);
+    if (chk) chk.checked = true;
+  }
+  updateAnalysisButtonState();
 }
 
-function selectRepository(repo, cardElement) {
-  selectedRepo = repo;
-  document.querySelectorAll('.repo-card').forEach(c => c.classList.remove('selected'));
-  if (cardElement) cardElement.classList.add('selected');
-  document.getElementById('runRepoAnalysisBtn').disabled = false;
+function updateAnalysisButtonState() {
+  const btn = document.getElementById('runRepoAnalysisBtn');
+  const count = selectedRepos.size;
+  if (count === 0) {
+    btn.disabled = true;
+    btn.querySelector('span:last-child').textContent = '⚡ Run AI Compatibility Analysis';
+  } else if (count === 1) {
+    btn.disabled = false;
+    btn.querySelector('span:last-child').textContent = `⚡ Run AI Analysis (1 Repository)`;
+  } else {
+    btn.disabled = false;
+    btn.querySelector('span:last-child').textContent = `⚡ Run AI Analysis (${count} Repositories)`;
+  }
 }
 
-// Execute Analysis
+// Execute Multi-Repo Analysis
 async function executeRepoAnalysis() {
-  if (!selectedRepo) return;
+  if (selectedRepos.size === 0) return;
 
   const spinner = document.getElementById('analysisSpinner');
   const btn = document.getElementById('runRepoAnalysisBtn');
@@ -173,26 +193,68 @@ async function executeRepoAnalysis() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE}/api/analyze/repository`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        owner: selectedRepo.owner,
-        repo: selectedRepo.name,
-        default_branch: selectedRepo.default_branch,
-        token: currentAuth ? currentAuth.token : '',
-        is_demo: currentAuth ? currentAuth.demo_mode : true
-      })
-    });
+    const reposList = Array.from(selectedRepos.values());
+    const combinedReport = {
+      repository: reposList.map(r => r.name).join(', '),
+      scanned_tf_files_count: 0,
+      scanned_files: [],
+      glue_jobs_count: 0,
+      summary: {
+        total_jobs: 0,
+        healthy: 0,
+        warnings: 0,
+        action_required: 0,
+        average_inefficiency_score: 0
+      },
+      jobs_analysis: []
+    };
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'Analysis request failed');
+    let totalInefficiencySum = 0;
+
+    for (const repo of reposList) {
+      const res = await fetch(`${API_BASE}/api/analyze/repository`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner: repo.owner,
+          repo: repo.name,
+          default_branch: repo.default_branch,
+          token: currentAuth ? currentAuth.token : '',
+          is_demo: currentAuth ? currentAuth.demo_mode : false,
+          use_grok: true
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.warn(`Analysis failed for ${repo.name}:`, err.detail);
+        continue;
+      }
+
+      const report = await res.json();
+      combinedReport.scanned_tf_files_count += (report.scanned_tf_files_count || 0);
+      combinedReport.glue_jobs_count += (report.glue_jobs_count || 0);
+      if (report.scanned_files) {
+        combinedReport.scanned_files.push(...report.scanned_files);
+      }
+      if (report.jobs_analysis) {
+        combinedReport.jobs_analysis.push(...report.jobs_analysis);
+      }
+      if (report.summary) {
+        combinedReport.summary.healthy += (report.summary.healthy || 0);
+        combinedReport.summary.warnings += (report.summary.warnings || 0);
+        combinedReport.summary.action_required += (report.summary.action_required || 0);
+        totalInefficiencySum += (report.summary.average_inefficiency_score * (report.glue_jobs_count || 1));
+      }
     }
 
-    const report = await res.json();
-    lastAnalysisReport = report;
-    renderAnalysisReport(report);
+    combinedReport.summary.total_jobs = combinedReport.glue_jobs_count;
+    combinedReport.summary.average_inefficiency_score = combinedReport.glue_jobs_count > 0 
+      ? Math.round(totalInefficiencySum / combinedReport.glue_jobs_count) 
+      : 0;
+
+    lastAnalysisReport = combinedReport;
+    renderAnalysisReport(combinedReport);
   } catch (err) {
     alert('Analysis Error: ' + err.message);
   } finally {

@@ -1,7 +1,8 @@
 """
 FastAPI Server for AWS Glue Terraform AI Analyzer
 Provides endpoints for GitHub authentication, repository listing,
-Terraform scanning, and intelligent Glue & Python compatibility analysis.
+Terraform scanning, and intelligent Glue & Python compatibility analysis
+with Grok (xAI) LLM integration and inefficiency scoring.
 """
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +11,10 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import os
 import sys
-from typing import Optional, List, Dict, Any
+from dotenv import load_dotenv
+
+# Load .env variables if present
+load_dotenv()
 
 # Ensure parent directory is in sys.path so backend package imports work
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,18 +29,20 @@ try:
     from backend.tf_parser import TerraformGlueParser
     from backend.analyzer import GlueAIAnalyzer
     from backend.github_service import GitHubService
+    from backend.groq_service import GroqAnalysisService
     from backend.sample_data import SAMPLE_REPOSITORIES, SAMPLE_GLUE_TERRAFORM
 except ImportError:
     from glue_specs import GLUE_SPECS
     from tf_parser import TerraformGlueParser
     from analyzer import GlueAIAnalyzer
     from github_service import GitHubService
+    from groq_service import GroqAnalysisService
     from sample_data import SAMPLE_REPOSITORIES, SAMPLE_GLUE_TERRAFORM
 
 app = FastAPI(
     title="AWS Glue Terraform AI Analyzer API",
-    description="Intelligent Analyzer for AWS Glue Terraform Code, Worker Types, Python Version & Cross-Package Compatibility",
-    version="1.0.0"
+    description="Intelligent Analyzer for AWS Glue Terraform Code, Worker Types, Python Version & Cross-Package Compatibility with Grok AI",
+    version="2.0.0"
 )
 
 # Enable CORS for local and web client integration
@@ -58,15 +64,29 @@ class RepoAnalysisRequest(BaseModel):
     default_branch: Optional[str] = "main"
     token: Optional[str] = None
     is_demo: Optional[bool] = False
+    grok_api_key: Optional[str] = None
+    use_grok: Optional[bool] = False
 
 class DirectHclAnalysisRequest(BaseModel):
     hcl_content: str
     filename: Optional[str] = "main.tf"
+    grok_api_key: Optional[str] = None
+    use_grok: Optional[bool] = False
+
+class GrokSingleAnalysisRequest(BaseModel):
+    job: Dict[str, Any]
+    grok_api_key: Optional[str] = None
 
 # Endpoints
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "AWS Glue Terraform AI Engine", "engine": "FastAPI + Python 3.12"}
+    grok_configured = bool(os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY"))
+    return {
+        "status": "ok",
+        "service": "AWS Glue Terraform AI Engine",
+        "engine": "FastAPI + Python 3.12",
+        "grok_configured": grok_configured
+    }
 
 @app.get("/api/specs")
 def get_glue_specs():
@@ -139,12 +159,14 @@ async def get_repositories(token: Optional[str] = None, demo: Optional[bool] = F
 async def analyze_repository(req: RepoAnalysisRequest):
     """
     Connects to GitHub repository, discovers all .tf files, extracts aws_glue_job
-    resources, and runs the AI Cross-Compatibility checks.
+    resources, and runs AI Cross-Compatibility, inefficiency scoring & recommendations.
     """
     owner = req.owner
     repo = req.repo
     token = req.token
     is_demo = req.is_demo or (token and token.lower() in ["demo", "demo-token", "test"]) or not token
+    grok_key = req.grok_api_key or os.getenv("GROK_API_KEY")
+    use_grok = bool(req.use_grok or grok_key)
 
     scanned_files = []
     discovered_jobs = []
@@ -186,14 +208,19 @@ async def analyze_repository(req: RepoAnalysisRequest):
     # Run AI Analysis for each detected Glue Job
     analyzed_jobs = []
     for job in discovered_jobs:
-        analysis_result = await GlueAIAnalyzer.analyze_job(job)
+        analysis_result = await GlueAIAnalyzer.analyze_job(
+            job=job,
+            grok_api_key=grok_key,
+            use_grok=use_grok
+        )
         analyzed_jobs.append(analysis_result)
 
-    # Compute overall repo health summary
+    # Compute overall repo health summary and average inefficiency
     total_jobs = len(analyzed_jobs)
     healthy_count = sum(1 for j in analyzed_jobs if j["verdict"] == "HEALTHY")
     warning_count = sum(1 for j in analyzed_jobs if "WARNINGS" in j["verdict"])
     action_required_count = sum(1 for j in analyzed_jobs if "ACTION REQUIRED" in j["verdict"])
+    avg_inefficiency = round(sum(j["inefficiency_score"] for j in analyzed_jobs) / total_jobs, 1) if total_jobs > 0 else 0
 
     return {
         "repository": f"{owner}/{repo}",
@@ -204,7 +231,8 @@ async def analyze_repository(req: RepoAnalysisRequest):
             "total_jobs": total_jobs,
             "healthy": healthy_count,
             "warnings": warning_count,
-            "action_required": action_required_count
+            "action_required": action_required_count,
+            "average_inefficiency_score": avg_inefficiency
         },
         "jobs_analysis": analyzed_jobs
     }
@@ -223,15 +251,58 @@ async def analyze_direct_hcl(req: DirectHclAnalysisRequest):
             "message": "No 'aws_glue_job' blocks found in provided HCL."
         }
 
+    grok_key = req.grok_api_key or os.getenv("GROK_API_KEY")
+    use_grok = bool(req.use_grok or grok_key)
+
     analyzed_jobs = []
     for job in jobs:
-        result = await GlueAIAnalyzer.analyze_job(job)
+        result = await GlueAIAnalyzer.analyze_job(
+            job=job,
+            grok_api_key=grok_key,
+            use_grok=use_grok
+        )
         analyzed_jobs.append(result)
+
+    total_jobs = len(analyzed_jobs)
+    avg_inefficiency = round(sum(j["inefficiency_score"] for j in analyzed_jobs) / total_jobs, 1) if total_jobs > 0 else 0
 
     return {
         "glue_jobs_count": len(analyzed_jobs),
+        "average_inefficiency_score": avg_inefficiency,
         "jobs_analysis": analyzed_jobs
     }
+
+@app.post("/api/analyze/groq")
+@app.post("/api/analyze/grok")
+async def analyze_with_groq_endpoint(req: GrokSingleAnalysisRequest):
+    """Directly triggers Groq AI reasoning for a single analyzed Glue job."""
+    groq_key = req.grok_api_key or os.getenv("GROQ_API_KEY") or os.getenv("GROK_API_KEY")
+    if not groq_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Groq API Key is required. Please provide it in the request or configure GROQ_API_KEY in .env."
+        )
+
+    job = req.job
+    rule_metrics = {
+        "inefficiency_score": job.get("inefficiency_score", 0),
+        "health_score": job.get("health_score", 100),
+        "critical_issues": [c["notes"] for c in job.get("library_checks", []) if c.get("status") == "fail"],
+        "worker_warnings": job.get("worker_warnings", []),
+        "recommended_glue_version": job.get("recommended_version", {}).get("glue_version", "5.0"),
+        "recommended_python_version": job.get("recommended_version", {}).get("python_version", "3.11")
+    }
+
+    result = await GroqAnalysisService.analyze_with_groq(
+        job_details=job,
+        rule_based_metrics=rule_metrics,
+        api_key=groq_key
+    )
+
+    if not result.get("available"):
+        raise HTTPException(status_code=502, detail=result.get("error", "Groq API call failed"))
+
+    return result
 
 # Mount static frontend directory
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
